@@ -19,6 +19,7 @@ data/contracts/*
 data/policies/*
 !data/contracts/.gitkeep
 !data/policies/.gitkeep
+data/chroma_db/
 
 # Mac system files
 .DS_Store
