@@ -31,7 +31,7 @@ def extract_text_from_pdf(file_path:str)->str:
 
 #Chunking
 def chunk_text(text: str) -> list[str]:
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=500)
     chunks = text_splitter.split_text(text)
     return chunks
 
