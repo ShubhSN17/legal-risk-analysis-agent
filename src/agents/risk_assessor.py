@@ -1,8 +1,12 @@
 import os
+import json
+import time
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from src.ingestion.pdf_parser import extract_text_from_pdf, chunk_text
+
 load_dotenv()
 
 #Pydantic Script (strict output schema)
@@ -12,9 +16,9 @@ class ClauseRisk(BaseModel):
     explanation: str = Field(description="A concise, factual explanation...")
 
 class RiskReport(BaseModel):
-    financial_liabilities: list[ClauseRisk] = Field(description="Risks related to hidden financial liabilities.")
-    termination_conditions: list[ClauseRisk] = Field(description="Risks related to termination conditions.")
-    indemnification_requirements: list[ClauseRisk] = Field(description="Risks related to overly broad indemnification.")
+    financial_liabilities: list[ClauseRisk] = Field(default=[], description="Risks related to hidden financial liabilities.")
+    termination_conditions: list[ClauseRisk] = Field(default=[], description="Risks related to termination conditions.")
+    indemnification_requirements: list[ClauseRisk] = Field(default=[], description="Risks related to overly broad indemnification.")
 
 #Initializing LLM
 llm = ChatGroq(model="llama-3.3-70b-versatile",api_key = os.getenv('GROQ_API_KEY'))
@@ -36,18 +40,49 @@ prompt = PromptTemplate.from_template(template = template)
 #Eexcution Chain
 chain = prompt | structured_llm
 
-#Input Data
-inputs = {
-    "contract_clauses": """
-        Section 4.1: The Vendor shall indemnify and hold harmless the Client against any and all claims, 
-        without limitation, arising from the use of the software. 
-        Section 5.2: The Client may terminate this agreement with a 90-day written notice, provided a 
-        termination fee of 50% of the remaining contract value is paid.
-    """
-}
+# 3. Execution Logic (Fixed to handle chunks)
+def analyze_contract(file_path: str):
+    """Extracts, chunks, and analyzes a contract."""
+    
+    # Extract text using your parser
+    full_text = extract_text_from_pdf(file_path)
+    if not full_text:
+        return "Analysis failed: No text extracted."
 
-#Invoking chain
-response = chain.invoke(inputs)
+    # Chunk the text using your chunker
+    chunks = chunk_text(full_text)
+    print(f"Extracted {len(full_text)} characters. Split into {len(chunks)} chunks.")
+    
+    aggregated_report = {
+        "financial_liabilities": [],
+        "termination_conditions": [],
+        "indemnification_requirements": []
+    }
 
-#using model_dump_json() to cleanly print the Pydantic object as a JSON string
-print(response.model_dump_json(indent=2))
+    # Iterate through each chunk and run the LLM
+    for i, chunk in enumerate(chunks):
+        print(f"Analyzing chunk {i + 1}/{len(chunks)}...")
+        
+        inputs = {"contract_clauses": chunk}
+        response = chain.invoke(inputs)
+        
+        # .model_dump() to get the raw python dictionary from the Pydantic object
+        chunk_data = response.model_dump()
+        
+        # Append the findings from this chunk to our master list
+        aggregated_report["financial_liabilities"].extend(chunk_data["financial_liabilities"])
+        aggregated_report["termination_conditions"].extend(chunk_data["termination_conditions"])
+        aggregated_report["indemnification_requirements"].extend(chunk_data["indemnification_requirements"])
+
+        time.sleep(1)
+        
+    # Return the final aggregated JSON
+    return json.dumps(aggregated_report, indent=2)
+
+if __name__ == "__main__":
+
+    pdf_path = "data/contracts/sample_contract.pdf" 
+    
+    result = analyze_contract(pdf_path)
+    print("\n--- Final Aggregated Risk Report ---")
+    print(result)
