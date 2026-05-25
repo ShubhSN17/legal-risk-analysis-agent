@@ -1,7 +1,7 @@
 import logging
 import os
 from dotenv import load_dotenv
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 #Global Logger Setup
@@ -11,44 +11,55 @@ logger = logging.getLogger(__name__)
 #Load Environment Variables
 load_dotenv()
 
+#HuggingFace embeddings (local)
+def get_embedding_model():
+    """Initializes and returns the local HuggingFace embedding model."""
+    return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
-def store_chunks_in_chroma(chunks: list[str]):
+def store_policies_in_chroma(chunks: list[str], source_name: str):
     """
-    Embeds text chunks using HuggingFace and stores them persistently in ChromaDB.
+    Embeds POLICY text chunks and stores them persistently.
     """
     try:
         logger.info("Initializing HuggingFace embeddings...")
-        embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        embeddings = get_embedding_model()
 
-        logger.info("Storing chunks in persistent ChromaDB...")
+        # Add metadata so the LLM knows exactly which policy document this rule came from
+        metadatas = [{"source": source_name} for _ in chunks]
 
-        #LangChain's Chroma wrapper to handle embeddings and persistence automatically
-        vector_store = Chroma.from_texts(texts=chunks,embedding=embeddings,persist_directory="data/chroma_db")
+        logger.info("Storing policy chunks in persistent ChromaDB...")
+
+        vector_store = Chroma.from_texts(
+            texts=chunks,
+            embedding=embeddings,
+            metadatas=metadatas,
+            persist_directory="data/chroma_db",
+            collection_name="company_policies"
+        )
 
         logger.info(f"Successfully stored {len(chunks)} chunks in data/chroma_db.")
-
         return vector_store
 
     except Exception as e:
         logger.exception(f"A critical error occurred while storing chunks: {e}")
         return None
     
-#Execution Guard
+# Execution Guard
 if __name__ == '__main__':
-    #import functions from parser
-    from src.ingestion.pdf_parser import extract_text_from_pdf, chunk_text
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    
+    # We are testing POLICY ingestion, NOT contract ingestion
+    test_policy_path = 'data/policies/company_playbook.txt'
+    
+    print("---- Starting Policy Ingestion Test ----")
+    
+    if os.path.exists(test_policy_path):
+        with open(test_policy_path, 'r') as file:
+            raw_policy_text = file.read()
+            
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+        policy_chunks = text_splitter.split_text(raw_policy_text)
 
-    test_path = 'data/contracts/sample_contract.pdf'
-
-    print("---- Starting Pipeline test ----")
-    raw_text = extract_text_from_pdf(test_path)
-
-    if raw_text:
-        print("Text Extracted. Chunking....")
-        text_chunks = chunk_text(raw_text)
-
-        print(f"Created {len(text_chunks)} chunks. Sending to vector store....")
-        store_chunks_in_chroma(text_chunks)
-        print("---Pipeline Complete---")
-    else:
-        print("Failed to extract Text...")
+        print(f"Created {len(policy_chunks)} policy chunks. Sending to vector store....")
+        store_policies_in_chroma(policy_chunks, source_name="company_playbook.txt")
+        print("--- Ingestion Complete ---")
