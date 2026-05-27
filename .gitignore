@@ -17,9 +17,16 @@ __pycache__/
 # Local Data storage 
 data/contracts/*
 data/policies/*
+
+# EXCEPTION: Always track the sample files so recruiters can test the app
+!data/contracts/sample_contract.pdf
+!data/policies/company_playbook.txt
 !data/contracts/.gitkeep
 !data/policies/.gitkeep
+
+# Never track the vector database binaries or temp files
 data/chroma_db/
+data/contracts/temp_*
 
 # Mac system files
 .DS_Store
