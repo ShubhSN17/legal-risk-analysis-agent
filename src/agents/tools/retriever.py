@@ -1,5 +1,6 @@
 import os
 import logging
+from functools import lru_cache
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -7,14 +8,16 @@ from langchain_huggingface import HuggingFaceEmbeddings
 logger = logging.getLogger(__name__)
 load_dotenv()
 
+@lru_cache(maxsize=1)
 def get_policy_retriever():
     """
     Connects to the persistent Chroma DB and returns a retriever for company policies.
+    The @lru_cache ensures the embedding model is only loaded into memory ONCE.
     """
     if not os.path.exists("data/chroma_db"):
         raise RuntimeError("Chroma DB not found. Run vector_store.py first to ingest policies.")
 
-    logger.info("Connecting to ChromaDB for policy retrieval...")
+    logger.info("Initializing Embeddings and Connecting to ChromaDB (This should only happen once!)...")
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
     
     vector_store = Chroma(
@@ -23,11 +26,10 @@ def get_policy_retriever():
         collection_name="company_policies"
     )
     
-    # Return the top 3 most relevant policy rules
     return vector_store.as_retriever(search_kwargs={"k": 3})
 
 if __name__ == '__main__':
-    # Test the retriever
+    #Test the retriever
     print("--- Testing Policy Retrieval ---")
     try:
         retriever = get_policy_retriever()
