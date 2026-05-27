@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
+import os
 
 # 1. Page Configuration (Wide Layout for Dashboard feel)
 st.set_page_config(page_title="Legal Risk Agent", page_icon="⚖️", layout="wide")
@@ -27,8 +28,10 @@ if st.button("Run AI Risk Analysis", type="primary"):
         with st.spinner("Agent is reading the contract and evaluating policies... (Estimated time: ~1-3 minutes)"):
             try:
                 # Send HTTP POST to FastAPI
+                api_endpoint = os.getenv("API_URL", "http://127.0.0.1:8000/analyze")
                 files = {"file": (uploaded_file.name, uploaded_file.getvalue(), "application/pdf")}
-                response = requests.post("http://127.0.0.1:8000/analyze", files=files)
+                
+                response = requests.post(api_endpoint, files=files)
                 
                 if response.status_code == 200:
                     report = response.json()
