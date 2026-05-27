@@ -29,9 +29,13 @@ class RiskReport(BaseModel):
     violations: list[Violation] = Field(default=[], 
         description="A list of policy violations. If the contract complies with the provided policies, or if no policies are relevant, return an empty list.")
 
-#Initializing LLM
-logger.info("Initializing Groq LLM...")
-llm = ChatGroq(model="llama-3.3-70b-versatile",api_key = os.getenv('GROQ_API_KEY'))
+# Initialize Groq LLM with Temperature 0.0 for strict, deterministic legal output
+logger.info("Initializing Groq LLM (Llama 3.3 70B, Temp 0.0)...")
+llm = ChatGroq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.getenv('GROQ_API_KEY'),
+    temperature=0.0
+)
 
 #Bind pydantic model to llm
 structured_llm = llm.with_structured_output(RiskReport)
