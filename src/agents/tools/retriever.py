@@ -1,6 +1,5 @@
 import os
 import logging
-from functools import lru_cache
 from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -8,21 +7,21 @@ from langchain_huggingface import HuggingFaceEmbeddings
 logger = logging.getLogger(__name__)
 load_dotenv()
 
-@lru_cache(maxsize=1)
+# 1. Initialize the model GLOBALLY. 
+# This happens exactly once when the server starts, eliminating the N+1 memory bottleneck entirely.
+logger.info("Initializing HuggingFace Embeddings into memory...")
+GLOBAL_EMBEDDINGS = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
 def get_policy_retriever():
     """
     Connects to the persistent Chroma DB and returns a retriever for company policies.
-    The @lru_cache ensures the embedding model is only loaded into memory ONCE.
     """
     if not os.path.exists("data/chroma_db"):
         raise RuntimeError("Chroma DB not found. Run vector_store.py first to ingest policies.")
 
-    logger.info("Initializing Embeddings and Connecting to ChromaDB (This should only happen once!)...")
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-    
     vector_store = Chroma(
         persist_directory="data/chroma_db",
-        embedding_function=embeddings,
+        embedding_function=GLOBAL_EMBEDDINGS,
         collection_name="company_policies"
     )
     

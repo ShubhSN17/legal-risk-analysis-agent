@@ -31,7 +31,8 @@ def extract_text_from_pdf(file_path:str)->str:
 
 #Chunking
 def chunk_text(text: str) -> list[str]:
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=6000, chunk_overlap=500)
+    # Changed from 6000 to 1000 to strictly fit the 256-token limit of all-MiniLM-L6-v2
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     chunks = text_splitter.split_text(text)
     return chunks
 
