@@ -195,7 +195,7 @@ python -m uvicorn src.api.main:api --reload
 ## 4️⃣ Start the Streamlit Frontend (Terminal 2)
 
 ```bash
-python -m streamlit run src.ui.app.py
+python -m streamlit run src/ui/app/py
 ```
 
 ---
