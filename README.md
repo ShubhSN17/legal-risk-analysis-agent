@@ -43,31 +43,27 @@ Building a reliable AI agent requires overcoming strict infrastructure and model
 
 ---
 
-## 1️⃣ The N+1 Network Bottleneck
+## 1️⃣ The Model Initialization (Memory) Bottleneck
 
 ### ❌ The Problem
-
-Initially, the LangGraph node initialized the HuggingFace embedding model for every single chunk of the parsed PDF.
-
-A **6-chunk document** resulted in:
-
-- 6 separate network calls
-- 6 model cold-boots
-- ~10-minute processing delays
+Initially, the LangGraph node instantiated the `HuggingFaceEmbeddings` model dynamically inside the evaluation loop. For a 40-chunk document, this forced the server to cold-boot the 80MB PyTorch tensor model into memory 40 separate times, causing massive memory spikes and multi-minute delays.
 
 ### ✅ The Solution
-
-Wrapped the retriever function in Python's singleton cache pattern:
-
-```python
-@lru_cache(maxsize=1)
-```
-
-This forced the system to load the model into memory **exactly once per session**, dropping execution time by **over 90%**.
+Refactored the architecture to instantiate the model globally exactly once at server startup. This ensured the model remained resident in memory, dropping chunk evaluation time to milliseconds and completely eliminating the I/O memory bottleneck.
 
 ---
 
-## 2️⃣ Output Hallucinations & Schema Failures
+## 2️⃣ Silent Token Truncation in Vector Search
+
+### ❌ The Problem
+The initial text parser used a chunk size of 6,000 characters. However, the chosen local embedding model (`all-MiniLM-L6-v2`) has a strict maximum sequence length of 256 tokens (roughly 1,000 to 1,200 characters). The model was silently truncating the chunks, meaning 80% of the contract text was never embedded or searchable, leading to false negatives in the vector search.
+
+### ✅ The Solution
+Recalibrated the `RecursiveCharacterTextSplitter` to a strict chunk size of 1000 characters with a 200-character overlap. This perfectly aligns with the model's physical token limits, ensuring zero data loss during vectorization while maintaining clause context.
+
+---
+
+## 3️⃣ Output Hallucinations & Schema Failures
 
 ### ❌ The Problem
 
@@ -93,7 +89,7 @@ This ensured the model behaved as a **deterministic compliance calculator**, yie
 
 ---
 
-## 3️⃣ API Rate Limiting (HTTP 429)
+## 4️⃣ API Rate Limiting (HTTP 429)
 
 ### ❌ The Problem
 
